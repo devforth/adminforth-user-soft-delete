@@ -1,0 +1,102 @@
+import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages} from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
+import type { PluginOptions } from './types.js';
+
+export default class UserSoftDelete extends AdminForthPlugin {
+  options: PluginOptions;
+
+  constructor(options: PluginOptions) {
+    super(options, import.meta.url);
+    this.options = options;
+  }
+
+  async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
+    super.modifyResourceConfig(adminforth, resourceConfig);
+    let allowDisableFunc;
+    if (this.options.canDeactivate) {
+      //console.log('Using canDeactivate from plugin options');
+      allowDisableFunc = this.options.canDeactivate;
+    } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'function') {
+      //console.log('Using existing delete permission function from resource config');
+      allowDisableFunc = resourceConfig.options.allowedActions.delete;
+    } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'boolean') {
+      //console.log('Using existing delete permission boolean from resource config:', resourceConfig.options.allowedActions.delete);
+      allowDisableFunc = async () => resourceConfig.options.allowedActions.delete;
+    } else {
+      //console.log('No delete permission function found, defaulting to allow all');
+      allowDisableFunc = async () => true;
+    }
+    
+    resourceConfig.options.allowedActions.delete = false;
+
+    resourceConfig.columns.push({
+      name: this.options.activeFieldName,
+      label: 'Is Active',
+      type: AdminForthDataTypes.BOOLEAN,
+      showIn: {
+        [AdminForthResourcePages.list]: true,
+        [AdminForthResourcePages.edit]: true,
+        [AdminForthResourcePages.create]: false,
+        [AdminForthResourcePages.filter]: true,
+        [AdminForthResourcePages.show]: true,
+      },
+      filterOptions: {
+        multiselect: false,
+      }
+    });
+
+    const beforeLoginConfirmation = this.adminforth.config.auth.beforeLoginConfirmation;
+    const beforeLoginConfirmationArray = Array.isArray(beforeLoginConfirmation) ? beforeLoginConfirmation : [beforeLoginConfirmation];
+    beforeLoginConfirmationArray.unshift(
+      async({ extra, adminUser }: { adminUser: AdminUser, response: IAdminForthHttpResponse, extra?: any} )=> {
+        const rejectResult = {
+          body:{
+            allowedLogin: false,
+            redirectTo: '/login',
+          },
+          ok: true
+        };
+        if (adminUser.dbUser[this.options.activeFieldName] === false) {
+          return rejectResult;
+        }
+      }
+    );
+
+    if ( !resourceConfig.options.pageInjections ) {
+      resourceConfig.options.pageInjections = {};
+    }
+    if ( !resourceConfig.options.pageInjections.list ) {
+      resourceConfig.options.pageInjections.list = {};
+    }
+    if ( !resourceConfig.options.pageInjections.list.threeDotsDropdownItems ) {
+      resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [];
+    }
+    (resourceConfig.options.pageInjections.list.threeDotsDropdownItems as AdminForthComponentDeclaration[]).push(
+      { file: this.componentPath('DisableButton.vue') }
+    );
+
+    // simply modify resourceConfig or adminforth.config. You can get access to plugin options via this.options;
+  }
+  
+  validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
+    // optional method where you can safely check field types after database discovery was performed
+  }
+
+  instanceUniqueRepresentation(pluginOptions: any) : string {
+    // optional method to return unique string representation of plugin instance. 
+    // Needed if plugin can have multiple instances on one resource 
+    return `single`;
+  }
+
+  setupEndpoints(server: IHttpServer) {
+    server.endpoint({
+      method: 'POST',
+      path: `/plugin/${this.pluginInstanceId}/example`,
+      handler: async ({ body }) => {
+        const { name } = body;
+        return { hey: `Hello ${name}` };
+      }
+    });
+  }
+
+}
