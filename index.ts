@@ -1,9 +1,10 @@
-import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages} from "adminforth";
+import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
-
+    
 export default class UserSoftDelete extends AdminForthPlugin {
   options: PluginOptions;
+  allowDisableFunc: Function | null | boolean = null;
 
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
@@ -12,19 +13,14 @@ export default class UserSoftDelete extends AdminForthPlugin {
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
-    let allowDisableFunc;
     if (this.options.canDeactivate) {
-      //console.log('Using canDeactivate from plugin options');
-      allowDisableFunc = this.options.canDeactivate;
+      this.allowDisableFunc = this.options.canDeactivate;
     } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'function') {
-      //console.log('Using existing delete permission function from resource config');
-      allowDisableFunc = resourceConfig.options.allowedActions.delete;
+      this.allowDisableFunc = resourceConfig.options.allowedActions.delete;
     } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'boolean') {
-      //console.log('Using existing delete permission boolean from resource config:', resourceConfig.options.allowedActions.delete);
-      allowDisableFunc = async () => resourceConfig.options.allowedActions.delete;
+      this.allowDisableFunc = async () => resourceConfig.options.allowedActions.delete;
     } else {
-      //console.log('No delete permission function found, defaulting to allow all');
-      allowDisableFunc = async () => true;
+      this.allowDisableFunc = async () => true;
     }
     
     resourceConfig.options.allowedActions.delete = false;
@@ -72,7 +68,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
       resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [];
     }
     (resourceConfig.options.pageInjections.list.threeDotsDropdownItems as AdminForthComponentDeclaration[]).push(
-      { file: this.componentPath('DisableButton.vue') }
+      { file: this.componentPath('DisableButton.vue'), meta: { pluginInstanceId: this.pluginInstanceId } }
     );
 
     // simply modify resourceConfig or adminforth.config. You can get access to plugin options via this.options;
@@ -85,16 +81,44 @@ export default class UserSoftDelete extends AdminForthPlugin {
   instanceUniqueRepresentation(pluginOptions: any) : string {
     // optional method to return unique string representation of plugin instance. 
     // Needed if plugin can have multiple instances on one resource 
-    return `single`;
+    return `user-soft-delete`;
   }
 
   setupEndpoints(server: IHttpServer) {
     server.endpoint({
       method: 'POST',
-      path: `/plugin/${this.pluginInstanceId}/example`,
-      handler: async ({ body }) => {
-        const { name } = body;
-        return { hey: `Hello ${name}` };
+      path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
+      handler: async ({ adminUser,body }) => {
+        let isAllowedToDeactivate = false;
+        if ( typeof this.allowDisableFunc === "function" ) {
+          isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
+        } else if (typeof this.allowDisableFunc === "boolean") {
+          isAllowedToDeactivate = this.allowDisableFunc;
+        }
+        if ( isAllowedToDeactivate === false ) {
+          return {ok: false, error: "Not allowed to deactivate user"}
+        }
+        const id = body.record;
+        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        
+        const oldUser = await this.adminforth
+          .resource(this.resourceConfig.resourceId)
+          .get([Filters.EQ(primaryKeyColumn.name, id)]);
+
+        if (!oldUser) {
+          throw new Error(`User with id ${id} not found`);
+        }
+
+        const newUser = { ...oldUser, [this.options.activeFieldName]: false };
+
+        await this.adminforth.updateResourceRecord({
+          resource: this.resourceConfig,
+          recordId: id,
+          oldRecord: oldUser,
+          record: newUser,
+          adminUser: adminUser
+        })
+        return {ok: true}
       }
     });
   }

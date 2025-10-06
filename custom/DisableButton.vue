@@ -1,13 +1,13 @@
 <template>
-  <div class="flex items-end justify-start gap-2 cursor-pointer" @click="openDialog()">
-    <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">Deactivate user</p>
-  </div>
+    <div class="flex items-end justify-start gap-2 cursor-pointer" :class="{'opacity-50': checkboxes.length !== 1}">
+        <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">Deactivate user</p>
+    </div>
     <Dialog
     ref="confirmDialog"
     class="w-96"
     header="Deactivate user"
     :buttons="[
-        { label: 'Confirm', onclick: (dialog) => { console.log('Confirmed'); dialog.hide(); } },
+        { label: 'Confirm', onclick: (dialog) => { deactivateUser(); dialog.hide(); } },
         { label: 'Cancel', onclick: (dialog) => dialog.hide() },
     ]"
     >
@@ -18,14 +18,45 @@
 </template>
 
 <script lang="ts" setup>
-import { Dialog } from '@/afcl';
-import { ref, watch } from 'vue';
+import { Dialog, Tooltip } from '@/afcl';
+import { ref } from 'vue';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
+import adminforth from "@/adminforth"
+import { callAdminForthApi } from '@/utils';
 
 const confirmDialog = ref(null);
 
 function openDialog() {
-    confirmDialog.value.open()
+    if ( props.checkboxes.length !== 1 ) {
+        if (props.checkboxes.lenght > 1) {
+            adminforth.alert({message: "Select only one account to deactivate", variant: "warning"})
+        } else {
+            adminforth.alert({message: "Select at least to deactivate", variant: "warning"})
+        }
+    } else {
+        confirmDialog.value.open()
+    }
+}
+
+async function deactivateUser() {
+    try {
+        const res = await callAdminForthApi({
+            path: `/plugin/${props.meta.pluginInstanceId}/deactivateUser`,
+            method: 'POST',
+            body: {
+                record: props.checkboxes[0],
+            },
+        });
+        if (!res || res.ok === false || res.error) {
+            if ( res.error ) {
+                throw new Error(res.error)
+            }
+            throw new Error("")
+        }
+        props.updateList();
+    } catch (e) {
+        adminforth.alert({message: `Error deactivating user. ${e}`, variant: "warning"});
+    }
 }
 
 const props = defineProps<{
@@ -42,11 +73,13 @@ const props = defineProps<{
     }
 }>();
 
-
-watch(props.checkboxes, (newVal) => {
-    // Handle checkbox changes
-    console.log("New checkboxes:", newVal)
+defineExpose({
+  click
 });
+
+function click() {
+  openDialog();
+}
 
 
 </script>
