@@ -4,6 +4,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && rsync -av --exclude 'node_modules' custom dist/"
   },
@@ -13,9 +16,35 @@
   "description": "",
   "devDependencies": {
     "@types/node": "latest",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "semantic-release": "^24.2.1",
+    "semantic-release-slack-bot": "^4.0.2"
   },
   "dependencies": {
     "adminforth": "^2.4.0-next.191"
-  }
+  },
+  "release": {
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "semantic-release-slack-bot",
+        {
+          "notifyOnSuccess": true,
+          "notifyOnFail": true,
+          "slackIcon": ":package:",
+          "markdownReleaseNotes": true
+        }
+      ]
+    ]
+  },
+  "branches": [
+    "main",
+    {
+      "name": "next",
+      "prerelease": true
+    }
+  ]
 }
