@@ -19,19 +19,30 @@
 
 <script lang="ts" setup>
 import { Dialog, Tooltip } from '@/afcl';
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
 import adminforth from "@/adminforth"
 import { callAdminForthApi } from '@/utils';
+import { AdminForthFilterOperators } from '@/types/Common';
 
 const confirmDialog = ref(null);
 
+onMounted(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    adminforth?.list?.updateFilter?.({
+        field: props.meta.field,
+        operator: AdminForthFilterOperators.EQ,
+        value: true,
+    });
+});
+
 function openDialog() {
     if ( props.checkboxes.length !== 1 ) {
-        if (props.checkboxes.lenght > 1) {
+        if (props.checkboxes.length > 1) {
             adminforth.alert({message: "Select only one account to deactivate", variant: "warning"})
         } else {
-            adminforth.alert({message: "Select at least to deactivate", variant: "warning"})
+            adminforth.alert({message: "Select at least one account to deactivate", variant: "warning"})
         }
     } else {
         confirmDialog.value.open()

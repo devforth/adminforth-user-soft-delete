@@ -1,6 +1,7 @@
 import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
+import { error } from "console";
     
 export default class UserSoftDelete extends AdminForthPlugin {
   options: PluginOptions;
@@ -25,27 +26,12 @@ export default class UserSoftDelete extends AdminForthPlugin {
     
     resourceConfig.options.allowedActions.delete = false;
 
-    resourceConfig.columns.push({
-      name: this.options.activeFieldName,
-      label: 'Is Active',
-      type: AdminForthDataTypes.BOOLEAN,
-      showIn: {
-        [AdminForthResourcePages.list]: true,
-        [AdminForthResourcePages.edit]: true,
-        [AdminForthResourcePages.create]: false,
-        [AdminForthResourcePages.filter]: true,
-        [AdminForthResourcePages.show]: true,
-      },
-      filterOptions: {
-        multiselect: false,
-      }
-    });
-
     const beforeLoginConfirmation = this.adminforth.config.auth.beforeLoginConfirmation;
     const beforeLoginConfirmationArray = Array.isArray(beforeLoginConfirmation) ? beforeLoginConfirmation : [beforeLoginConfirmation];
     beforeLoginConfirmationArray.unshift(
       async({ extra, adminUser }: { adminUser: AdminUser, response: IAdminForthHttpResponse, extra?: any} )=> {
         const rejectResult = {
+          error: 'Your account is deactivated',
           body:{
             allowedLogin: false,
             redirectTo: '/login',
@@ -68,7 +54,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
       resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [];
     }
     (resourceConfig.options.pageInjections.list.threeDotsDropdownItems as AdminForthComponentDeclaration[]).push(
-      { file: this.componentPath('DisableButton.vue'), meta: { pluginInstanceId: this.pluginInstanceId } }
+      { file: this.componentPath('DisableButton.vue'), meta: { pluginInstanceId: this.pluginInstanceId, field: this.options.activeFieldName } }
     );
 
     // simply modify resourceConfig or adminforth.config. You can get access to plugin options via this.options;
@@ -76,6 +62,16 @@ export default class UserSoftDelete extends AdminForthPlugin {
   
   validateConfigAfterDiscover(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     // optional method where you can safely check field types after database discovery was performed
+    if (!this.options.activeFieldName) {
+      throw new Error(`Option activeFieldName is required for UserSoftDelete plugin on resource ${this.resourceConfig.resourceId}`);
+    }
+    const column = this.resourceConfig.columns.find(f => f.name === this.options.activeFieldName);
+    if (!column) {
+      throw new Error(`Field ${this.options.activeFieldName} not found in resource ${this.resourceConfig.resourceId}`);
+    }
+    if (![AdminForthDataTypes.BOOLEAN].includes(column!.type!)) {
+      throw new Error(`Field ${this.options.activeFieldName} should be boolean, but it is ${column!.type}`);
+    }
   }
 
   instanceUniqueRepresentation(pluginOptions: any) : string {
@@ -107,6 +103,10 @@ export default class UserSoftDelete extends AdminForthPlugin {
 
         if (!oldUser) {
           throw new Error(`User with id ${id} not found`);
+        }
+
+        if (oldUser[this.options.activeFieldName] === false) {
+          return {ok: false, error: "User is already deactivated"}
         }
 
         const newUser = { ...oldUser, [this.options.activeFieldName]: false };
