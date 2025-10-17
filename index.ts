@@ -64,11 +64,18 @@ export default class UserSoftDelete extends AdminForthPlugin {
     if ( !resourceConfig.options.pageInjections.list ) {
       resourceConfig.options.pageInjections.list = {};
     }
-    if ( !resourceConfig.options.pageInjections.list.threeDotsDropdownItems ) {
-      resourceConfig.options.pageInjections.list.threeDotsDropdownItems = [];
+    if ( !resourceConfig.options.pageInjections.list.customActionIcons ) {
+      resourceConfig.options.pageInjections.list.customActionIcons = [];
     }
-    (resourceConfig.options.pageInjections.list.threeDotsDropdownItems as AdminForthComponentDeclaration[]).push(
+    (resourceConfig.options.pageInjections.list.customActionIcons as AdminForthComponentDeclaration[]).push(
       { file: this.componentPath('DisableButton.vue'), meta: { pluginInstanceId: this.pluginInstanceId, field: this.options.activeFieldName } }
+    );
+
+    if ( !resourceConfig.options.pageInjections.list.afterBreadcrumbs ) {
+      resourceConfig.options.pageInjections.list.afterBreadcrumbs = [];
+    }
+    (resourceConfig.options.pageInjections.list.afterBreadcrumbs as AdminForthComponentDeclaration[]).push(
+      { file: this.componentPath('UserSoftDeleteFilterSetter.vue'), meta: { pluginInstanceId: this.pluginInstanceId, field: this.options.activeFieldName } }
     );
 
     // simply modify resourceConfig or adminforth.config. You can get access to plugin options via this.options;
@@ -106,8 +113,9 @@ export default class UserSoftDelete extends AdminForthPlugin {
         if ( isAllowedToDeactivate === false ) {
           return {ok: false, error: "Not allowed to deactivate user"}
         }
-        const id = body.record;
+
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        const id = body.record[primaryKeyColumn.name];
         
         const oldUser = await this.adminforth
           .resource(this.resourceConfig.resourceId)
@@ -119,6 +127,10 @@ export default class UserSoftDelete extends AdminForthPlugin {
 
         if (oldUser[this.options.activeFieldName] === false) {
           return {ok: false, error: "User is already deactivated"}
+        }
+        
+        if (oldUser[primaryKeyColumn.name] === adminUser.dbUser[primaryKeyColumn.name]) {
+          return {ok: false, error: "You cannot deactivate your own account"}
         }
 
         const newUser = { ...oldUser, [this.options.activeFieldName]: false };

@@ -1,7 +1,15 @@
 <template>
-    <div class="flex items-end justify-start gap-2 cursor-pointer" :class="{'opacity-50': checkboxes.length !== 1}">
-        <p class="text-justify max-h-[18px] truncate max-w-[60vw] md:max-w-none">Deactivate user</p>
-    </div>
+    <Tooltip>
+        <button
+            @click="openDialog()"
+        >
+            <IconUserRemoveSolid class="w-5 h-5 me-2"/>
+        </button>
+
+        <template v-slot:tooltip>
+            {{ $t('Deactivate user') }}
+        </template>
+    </Tooltip>
     <Dialog
     ref="confirmDialog"
     class="w-96"
@@ -19,36 +27,16 @@
 
 <script lang="ts" setup>
 import { Dialog, Tooltip } from '@/afcl';
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { AdminUser, type AdminForthResourceCommon } from '@/types';
 import adminforth from "@/adminforth"
 import { callAdminForthApi } from '@/utils';
-import { AdminForthFilterOperators } from '@/types/Common';
-
+import { IconUserRemoveSolid } from '@iconify-prerendered/vue-flowbite';
 
 const confirmDialog = ref(null);
 
-
-onMounted(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    adminforth?.list?.updateFilter?.({
-        field: props.meta.field,
-        operator: AdminForthFilterOperators.EQ,
-        value: true,
-    });
-});
-
 function openDialog() {
-    if ( props.checkboxes.length !== 1 ) {
-        if (props.checkboxes.length > 1) {
-            adminforth.alert({message: "Select only one account to deactivate", variant: "warning"})
-        } else {
-            adminforth.alert({message: "Select at least one account to deactivate", variant: "warning"})
-        }
-    } else {
-        confirmDialog.value.open()
-    }
+    confirmDialog.value.open();
 }
 
 async function deactivateUser() {
@@ -57,7 +45,7 @@ async function deactivateUser() {
             path: `/plugin/${props.meta.pluginInstanceId}/deactivateUser`,
             method: 'POST',
             body: {
-                record: props.checkboxes[0],
+                record: props.record,
             },
         });
         if (!res || res.ok === false || res.error) {
@@ -66,33 +54,19 @@ async function deactivateUser() {
             }
             throw new Error("")
         }
-        props.updateList();
+        props.updateRecords();
     } catch (e) {
         adminforth.alert({message: `Error deactivating user. ${e}`, variant: "warning"});
     }
 }
 
 const props = defineProps<{
-    checkboxes: any,
     meta: any,
     resource: AdminForthResourceCommon,
     adminUser: AdminUser,
-    updateList: {
-        type: Function,
-        required: true
-    },
-    clearCheckboxes: {
-        type: Function
-    }
+    record: any,
+    updateRecords: Function,
 }>();
-
-defineExpose({
-  click
-});
-
-function click() {
-  openDialog();
-}
 
 
 </script>
