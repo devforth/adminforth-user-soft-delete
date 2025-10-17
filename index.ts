@@ -44,6 +44,20 @@ export default class UserSoftDelete extends AdminForthPlugin {
       }
     );
 
+    const adminUserAuthorize = this.adminforth.config.auth.adminUserAuthorize;
+    const adminUserAuthorizeArray = Array.isArray(adminUserAuthorize) ? adminUserAuthorize : [adminUserAuthorize];
+    adminUserAuthorizeArray.unshift(
+      async({ extra, adminUser }: { adminUser: AdminUser, response: IAdminForthHttpResponse, extra?: any} )=> {
+        const rejectResult = {
+          error: 'Your account is deactivated',
+          allowed: false,
+        };
+        if (adminUser.dbUser[this.options.activeFieldName] === false) {
+          return rejectResult;
+        }
+      }
+    );
+
     if ( !resourceConfig.options.pageInjections ) {
       resourceConfig.options.pageInjections = {};
     }
@@ -88,8 +102,6 @@ export default class UserSoftDelete extends AdminForthPlugin {
         let isAllowedToDeactivate = false;
         if ( typeof this.allowDisableFunc === "function" ) {
           isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
-        } else if (typeof this.allowDisableFunc === "boolean") {
-          isAllowedToDeactivate = this.allowDisableFunc;
         }
         if ( isAllowedToDeactivate === false ) {
           return {ok: false, error: "Not allowed to deactivate user"}
