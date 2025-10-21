@@ -35,12 +35,12 @@ export default class UserSoftDelete extends AdminForthPlugin {
           body:{
             allowedLogin: false,
             redirectTo: '/login',
-          },
-          ok: true
+          }
         };
         if (adminUser.dbUser[this.options.activeFieldName] === false) {
           return rejectResult;
         }
+        return { body: {allowedLogin: true} };
       }
     );
 
@@ -55,6 +55,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
         if (adminUser.dbUser[this.options.activeFieldName] === false) {
           return rejectResult;
         }
+        return { allowed: true };
       }
     );
 
