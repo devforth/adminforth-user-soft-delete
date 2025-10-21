@@ -134,7 +134,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
           return {ok: false, error: "You cannot deactivate your own account"}
         }
 
-        const newUser = { ...oldUser, [this.options.activeFieldName]: false };
+        const newUser = { [this.options.activeFieldName]: false };
 
         await this.adminforth.updateResourceRecord({
           resource: this.resourceConfig,
