@@ -13,14 +13,14 @@
     <Dialog
     ref="confirmDialog"
     class="w-96"
-    header="Deactivate user"
+    :header="t('Deactivate user')"
     :buttons="[
-        { label: 'Confirm', onclick: (dialog) => { deactivateUser(); dialog.hide(); } },
-        { label: 'Cancel', onclick: (dialog) => dialog.hide() },
+        { label: t('Confirm'), onclick: (dialog) => { deactivateUser(); dialog.hide(); } },
+        { label: t('Cancel'), onclick: (dialog) => dialog.hide() },
     ]"
     >
     <div class="space-y-4">
-        <p>Are you sure you want to deactivate this user?</p>
+        <p>{{ $t('Are you sure you want to deactivate this user?') }}</p>
     </div>
     </Dialog>
 </template>
@@ -32,7 +32,9 @@ import { AdminUser, type AdminForthResourceCommon } from '@/types';
 import adminforth from "@/adminforth"
 import { callAdminForthApi } from '@/utils';
 import { IconUserRemoveSolid } from '@iconify-prerendered/vue-flowbite';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const confirmDialog = ref(null);
 
 function openDialog() {
@@ -56,7 +58,7 @@ async function deactivateUser() {
         }
         props.updateRecords();
     } catch (e) {
-        adminforth.alert({message: `Error deactivating user. ${e}`, variant: "warning"});
+        adminforth.alert({message: t(`Error deactivating user. ${e}`), variant: "warning"});
     }
 }
 

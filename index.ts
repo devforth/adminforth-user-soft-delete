@@ -135,7 +135,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
         }
 
         const newUser = { [this.options.activeFieldName]: false };
-
+        
         await this.adminforth.updateResourceRecord({
           resource: this.resourceConfig,
           recordId: id,
