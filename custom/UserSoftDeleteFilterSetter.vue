@@ -6,9 +6,12 @@
 import { onMounted } from 'vue';
 import { AdminForthFilterOperators } from '@/types/Common';
 import adminforth from "@/adminforth"
+import { useFiltersStore } from '@/stores/filters';
+
+const filtersStore = useFiltersStore();
+
 onMounted(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    adminforth?.list?.updateFilter?.({
+    filtersStore.setFilter({
         field: props.meta.field,
         operator: AdminForthFilterOperators.EQ,
         value: true,
