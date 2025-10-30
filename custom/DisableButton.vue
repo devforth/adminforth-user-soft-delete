@@ -1,44 +1,33 @@
 <template>
     <Tooltip>
-        <button
-            @click="openDialog()"
-        >
+        <button @click="onClick">
             <IconUserRemoveSolid class="w-5 h-5 me-2"/>
         </button>
-
-        <template v-slot:tooltip>
+        <template #tooltip>
             {{ $t('Deactivate user') }}
         </template>
     </Tooltip>
-    <Dialog
-    ref="confirmDialog"
-    class="w-96"
-    :header="t('Deactivate user')"
-    :buttons="[
-        { label: t('Confirm'), onclick: (dialog) => { deactivateUser(); dialog.hide(); } },
-        { label: t('Cancel'), onclick: (dialog) => dialog.hide() },
-    ]"
-    >
-    <div class="space-y-4">
-        <p>{{ $t('Are you sure you want to deactivate this user?') }}</p>
-    </div>
-    </Dialog>
 </template>
 
 <script lang="ts" setup>
-import { Dialog, Tooltip } from '@/afcl';
-import { ref } from 'vue';
-import { AdminUser, type AdminForthResourceCommon } from '@/types';
+import { Tooltip } from '@/afcl';
+import { type AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import adminforth from "@/adminforth"
 import { callAdminForthApi } from '@/utils';
 import { IconUserRemoveSolid } from '@iconify-prerendered/vue-flowbite';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
-const confirmDialog = ref(null);
 
-function openDialog() {
-    confirmDialog.value.open();
+async function onClick() {
+    const confirmed = await adminforth.confirm({
+        message: t('Are you sure you want to deactivate this user?'),
+        yes: t('Confirm'),
+        no: t('Cancel'),
+    });
+    if (confirmed) {
+        await deactivateUser();
+    }
 }
 
 async function deactivateUser() {
