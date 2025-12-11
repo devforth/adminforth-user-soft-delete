@@ -1,6 +1,6 @@
 <template>
     <Tooltip>
-        <button @click="onClick">
+        <button @click="onClick" class="user-soft-delete-button">
             <IconUserRemoveSolid class="w-5 h-5 me-2"/>
         </button>
         <template #tooltip>
