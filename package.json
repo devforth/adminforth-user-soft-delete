@@ -21,7 +21,7 @@
     "typescript": "^5.7.3"
   },
   "peerDependencies": {
-    "adminforth": "^2.4.0-next.254"
+    "adminforth": "^2.13.0-next.46"
   },
   "release": {
     "plugins": [
