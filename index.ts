@@ -58,6 +58,8 @@ export default class UserSoftDelete extends AdminForthPlugin {
         return { allowed: true };
       }
     );
+    
+    this.adminforth.config.auth.beforeLoginConfirmation = beforeLoginConfirmationArray;
 
     if ( !resourceConfig.options.pageInjections ) {
       resourceConfig.options.pageInjections = {};
