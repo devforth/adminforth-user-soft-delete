@@ -1,6 +1,6 @@
-import type { AdminUser } from "adminforth";
+import type { AdminUser, PluginsCommonOptions} from "adminforth";
 
-export interface PluginOptions {
+export interface PluginOptions extends PluginsCommonOptions {
     activeFieldName: string; 
     canDeactivate: (adminUser: AdminUser) => Promise<boolean>;
 }
