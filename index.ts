@@ -118,7 +118,13 @@ export default class UserSoftDelete extends AdminForthPlugin {
         }
 
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+        if (!body.record) {
+          return { ok: false, error: "No record provided" };
+        }
         const id = body.record[primaryKeyColumn.name];
+        if (id === undefined || id === null) {
+          return { ok: false, error: "No record id provided" };
+        }
         
         const oldUser = await this.adminforth
           .resource(this.resourceConfig.resourceId)
