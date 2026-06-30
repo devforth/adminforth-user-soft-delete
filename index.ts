@@ -1,4 +1,4 @@
-import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
+import { AdminForthPlugin, parseBody, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { error } from "console";
@@ -15,22 +15,6 @@ export default class UserSoftDelete extends AdminForthPlugin {
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
     this.options = options;
-  }
-
-  private parseBody<T>(
-    schema: z.ZodType<T>,
-    body: unknown,
-    response: { setStatus: (code: number, message: string) => void },
-  ): { ok: true; data: T } | { ok: false; error: { error: string; details: unknown } } {
-    const parsed = schema.safeParse(body ?? {});
-    if (!parsed.success) {
-      response.setStatus(400, '');
-      return {
-        ok: false,
-        error: { error: 'Request body validation failed', details: parsed.error.issues },
-      };
-    }
-    return { ok: true, data: parsed.data };
   }
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
@@ -130,7 +114,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
       handler: async ({ adminUser, body, response }) => {
-        const parsed = this.parseBody(deactivateUserBodySchema, body, response);
+        const parsed = parseBody(deactivateUserBodySchema, body, response);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         let isAllowedToDeactivate = false;
