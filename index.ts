@@ -21,13 +21,16 @@ export default class UserSoftDelete extends AdminForthPlugin {
     schema: z.ZodType<T>,
     body: unknown,
     response: { setStatus: (code: number, message: string) => void },
-  ): T | null {
+  ): { ok: true; data: T } | { ok: false; error: { error: string; details: unknown } } {
     const parsed = schema.safeParse(body ?? {});
     if (!parsed.success) {
-      response.setStatus(422, parsed.error.message);
-      return null;
+      response.setStatus(400, '');
+      return {
+        ok: false,
+        error: { error: 'Request body validation failed', details: parsed.error.issues },
+      };
     }
-    return parsed.data;
+    return { ok: true, data: parsed.data };
   }
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
@@ -127,8 +130,9 @@ export default class UserSoftDelete extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
       handler: async ({ adminUser, body, response }) => {
-        const data = this.parseBody(deactivateUserBodySchema, body, response);
-        if (!data) return;
+        const parsed = this.parseBody(deactivateUserBodySchema, body, response);
+        if ('error' in parsed) return parsed.error;
+        const data = parsed.data;
         let isAllowedToDeactivate = false;
         if ( typeof this.allowDisableFunc === "function" ) {
           isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
