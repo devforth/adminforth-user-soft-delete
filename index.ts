@@ -5,7 +5,7 @@ import { error } from "console";
 import { z } from "zod";
 
 const deactivateUserBodySchema = z.object({
-  record: z.record(z.string(), z.unknown()).nullish(),
+  record: z.record(z.string(), z.unknown()),
 }).strict();
 
 export default class UserSoftDelete extends AdminForthPlugin {
@@ -114,7 +114,9 @@ export default class UserSoftDelete extends AdminForthPlugin {
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
       handler: async ({ adminUser, body, response }) => {
+        console.log(`UserSoftDelete: deactivateUser endpoint called by ${adminUser.dbUser[this.resourceConfig.columns.find((col) => col.primaryKey).name]}`);
         const parsed = parseBody(deactivateUserBodySchema, body, response);
+        console.log(`UserSoftDelete: parsed body: ${JSON.stringify(parsed)}`);
         if ('error' in parsed) return parsed.error;
         const data = parsed.data;
         let isAllowedToDeactivate = false;
