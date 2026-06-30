@@ -2,7 +2,12 @@ import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters
 import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { error } from "console";
-    
+import { z } from "zod";
+
+const deactivateUserBodySchema = z.object({
+  record: z.record(z.string(), z.unknown()).nullish(),
+}).strict();
+
 export default class UserSoftDelete extends AdminForthPlugin {
   options: PluginOptions;
   allowDisableFunc: Function | null | boolean = null;
@@ -10,6 +15,19 @@ export default class UserSoftDelete extends AdminForthPlugin {
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
     this.options = options;
+  }
+
+  private parseBody<T>(
+    schema: z.ZodType<T>,
+    body: unknown,
+    response: { setStatus: (code: number, message: string) => void },
+  ): T | null {
+    const parsed = schema.safeParse(body ?? {});
+    if (!parsed.success) {
+      response.setStatus(422, parsed.error.message);
+      return null;
+    }
+    return parsed.data;
   }
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
@@ -108,7 +126,9 @@ export default class UserSoftDelete extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
-      handler: async ({ adminUser,body }) => {
+      handler: async ({ adminUser, body, response }) => {
+        const data = this.parseBody(deactivateUserBodySchema, body, response);
+        if (!data) return;
         let isAllowedToDeactivate = false;
         if ( typeof this.allowDisableFunc === "function" ) {
           isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
@@ -118,10 +138,10 @@ export default class UserSoftDelete extends AdminForthPlugin {
         }
 
         const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        if (!body.record) {
+        if (!data.record) {
           return { ok: false, error: "No record provided" };
         }
-        const id = body.record[primaryKeyColumn.name];
+        const id = data.record[primaryKeyColumn.name];
         if (id === undefined || id === null) {
           return { ok: false, error: "No record id provided" };
         }
