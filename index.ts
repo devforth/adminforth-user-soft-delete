@@ -1,4 +1,4 @@
-import { AdminForthPlugin, parseBody, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
+import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { error } from "console";
@@ -113,12 +113,10 @@ export default class UserSoftDelete extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
+      request_schema: deactivateUserBodySchema,
       handler: async ({ adminUser, body, response }) => {
         console.log(`UserSoftDelete: deactivateUser endpoint called by ${adminUser.dbUser[this.resourceConfig.columns.find((col) => col.primaryKey).name]}`);
-        const parsed = parseBody(deactivateUserBodySchema, body, response);
-        console.log(`UserSoftDelete: parsed body: ${JSON.stringify(parsed)}`);
-        if ('error' in parsed) return parsed.error;
-        const data = parsed.data;
+        const data = body as z.infer<typeof deactivateUserBodySchema>;
         let isAllowedToDeactivate = false;
         if ( typeof this.allowDisableFunc === "function" ) {
           isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
