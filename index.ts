@@ -1,5 +1,5 @@
 import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
-import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, IAdminForthHttpResponse, AdminUser, AdminForthComponentDeclaration } from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { error } from "console";
 import { z } from "zod";
@@ -34,7 +34,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
     const beforeLoginConfirmation = this.adminforth.config.auth.beforeLoginConfirmation;
     const beforeLoginConfirmationArray = Array.isArray(beforeLoginConfirmation) ? beforeLoginConfirmation : [beforeLoginConfirmation];
     beforeLoginConfirmationArray.unshift(
-      async({ extra, adminUser }: { adminUser: AdminUser, response: IAdminForthHttpResponse, extra?: any} )=> {
+      async({ extra, adminUser }: { adminUser: AdminUser, extra?: any} )=> {
         const rejectResult = {
           error: 'Your account is deactivated',
           body:{
@@ -52,7 +52,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
     const adminUserAuthorize = this.adminforth.config.auth.adminUserAuthorize;
     const adminUserAuthorizeArray = Array.isArray(adminUserAuthorize) ? adminUserAuthorize : [adminUserAuthorize];
     adminUserAuthorizeArray.unshift(
-      async({ extra, adminUser }: { adminUser: AdminUser, response: IAdminForthHttpResponse, extra?: any} )=> {
+      async({ extra, adminUser }: { adminUser: AdminUser, extra?: any} )=> {
         const rejectResult = {
           error: 'Your account is deactivated',
           allowed: false,
@@ -156,7 +156,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
           resource: this.resourceConfig,
           recordId: id,
           oldRecord: oldUser,
-          record: newUser,
+          updates: newUser,
           adminUser: adminUser
         })
         return {ok: true}
