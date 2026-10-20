@@ -1,5 +1,5 @@
-import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
-import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, AdminUser, AdminForthComponentDeclaration } from "adminforth";
+import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters, ActionCheckSource } from "adminforth";
+import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, AdminUser, AdminForthComponentDeclaration, AllowedActionValue } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { error } from "console";
 import { z } from "zod";
@@ -10,7 +10,7 @@ const deactivateUserBodySchema = z.object({
 
 export default class UserSoftDelete extends AdminForthPlugin {
   options: PluginOptions;
-  allowDisableFunc: Function | null | boolean = null;
+  deleteAllowed: AllowedActionValue;
 
   constructor(options: PluginOptions) {
     super(options, import.meta.url);
@@ -19,16 +19,8 @@ export default class UserSoftDelete extends AdminForthPlugin {
 
   async modifyResourceConfig(adminforth: IAdminForth, resourceConfig: AdminForthResource) {
     super.modifyResourceConfig(adminforth, resourceConfig);
-    if (this.options.canDeactivate) {
-      this.allowDisableFunc = this.options.canDeactivate;
-    } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'function') {
-      this.allowDisableFunc = resourceConfig.options.allowedActions.delete;
-    } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'boolean') {
-      this.allowDisableFunc = async () => resourceConfig.options.allowedActions.delete;
-    } else {
-      this.allowDisableFunc = async () => true;
-    }
-    
+    // remember original delete permission before hiding the standard delete button
+    this.deleteAllowed = resourceConfig.options.allowedActions.delete;
     resourceConfig.options.allowedActions.delete = false;
 
     const beforeLoginConfirmation = this.adminforth.config.auth.beforeLoginConfirmation;
@@ -109,6 +101,24 @@ export default class UserSoftDelete extends AdminForthPlugin {
     return `single`;
   }
 
+  async isAllowedToDeactivate(adminUser: AdminUser): Promise<boolean> {
+    const { canDeactivate } = this.options;
+    if (canDeactivate !== undefined) {
+      return typeof canDeactivate === 'function' ? canDeactivate(adminUser) : canDeactivate;
+    }
+    if (typeof this.deleteAllowed === 'function') {
+      const allowed = await this.deleteAllowed({
+        adminUser,
+        resource: this.resourceConfig,
+        meta: {},
+        source: ActionCheckSource.DeleteRequest,
+        adminforth: this.adminforth,
+      });
+      return allowed === true;
+    }
+    return this.deleteAllowed;
+  }
+
   setupEndpoints(server: IHttpServer) {
     server.endpoint({
       method: 'POST',
@@ -117,11 +127,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
       handler: async ({ adminUser, body, response }) => {
         console.log(`UserSoftDelete: deactivateUser endpoint called by ${adminUser.dbUser[this.resourceConfig.columns.find((col) => col.primaryKey).name]}`);
         const data = body as z.infer<typeof deactivateUserBodySchema>;
-        let isAllowedToDeactivate = false;
-        if ( typeof this.allowDisableFunc === "function" ) {
-          isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
-        }
-        if ( isAllowedToDeactivate === false ) {
+        if (!await this.isAllowedToDeactivate(adminUser)) {
           return {ok: false, error: "Not allowed to deactivate user"}
         }
 
