@@ -1,8 +1,14 @@
 <template>
     <Tooltip>
-        <button @click="onClick" class="user-soft-delete-button">
-            <IconUserRemoveSolid class="w-5 h-5 me-2"/>
-        </button>
+        <Button
+            class="af-user-soft-delete-button"
+            variant="ghost"
+            size="sm"
+            iconOnly
+            @click="onClick"
+        >
+            <IconUserX />
+        </Button>
         <template #tooltip>
             {{ $t('Deactivate user') }}
         </template>
@@ -10,20 +16,23 @@
 </template>
 
 <script lang="ts" setup>
-import { Tooltip } from '@/afcl';
+import { Button, Tooltip } from '@/afcl';
 import { type AdminUser, type AdminForthResourceCommon } from '@/types/Common';
 import adminforth from "@/adminforth"
 import { callAdminForthApi } from '@/utils';
-import { IconUserRemoveSolid } from '@iconify-prerendered/vue-flowbite';
+import { IconUserX } from '@iconify-prerendered/vue-lucide';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
 async function onClick() {
     const confirmed = await adminforth.confirm({
-        message: t('Are you sure you want to deactivate this user?'),
-        yes: t('Confirm'),
+        title: t('Are you sure you want to deactivate this user?'),
+        message: t('The user will not be able to log in.'),
+        yes: t('Deactivate'),
         no: t('Cancel'),
+        dangerous: true,
+        icon: IconUserX,
     });
     if (confirmed) {
         await deactivateUser();
@@ -47,7 +56,7 @@ async function deactivateUser() {
         }
         props.updateRecords();
     } catch (e) {
-        adminforth.alert({message: t(`Error deactivating user. ${e}`), variant: "warning"});
+        adminforth.alert({message: t(`Error deactivating user. ${e}`), variant: "danger"});
     }
 }
 
