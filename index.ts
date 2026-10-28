@@ -113,6 +113,7 @@ export default class UserSoftDelete extends AdminForthPlugin {
     server.endpoint({
       method: 'POST',
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
+      agent: { requiresHumanApproval: true },
       request_schema: deactivateUserBodySchema,
       handler: async ({ adminUser, body, response }) => {
         console.log(`UserSoftDelete: deactivateUser endpoint called by ${adminUser.dbUser[this.resourceConfig.columns.find((col) => col.primaryKey).name]}`);
