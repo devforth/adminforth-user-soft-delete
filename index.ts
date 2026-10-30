@@ -1,4 +1,4 @@
-import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters} from "adminforth";
+import { AdminForthPlugin, AdminForthDataTypes, AdminForthResourcePages, Filters, ActionCheckSource } from "adminforth";
 import type { IAdminForth, IHttpServer, AdminForthResourceColumn, AdminForthResource, AdminUser, AdminForthComponentDeclaration } from "adminforth";
 import type { PluginOptions } from './types.js';
 import { error } from "console";
@@ -22,9 +22,15 @@ export default class UserSoftDelete extends AdminForthPlugin {
     if (this.options.canDeactivate) {
       this.allowDisableFunc = this.options.canDeactivate;
     } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'function') {
-      this.allowDisableFunc = resourceConfig.options.allowedActions.delete;
+      // a permission callback takes the whole check context, not just the user
+      const deleteAllowed = resourceConfig.options.allowedActions.delete;
+      this.allowDisableFunc = async (adminUser: AdminUser) => await deleteAllowed({
+        adminUser, resource: resourceConfig, meta: {}, source: ActionCheckSource.DeleteRequest, adminforth,
+      }) === true;
     } else if (resourceConfig.options.allowedActions.delete && typeof resourceConfig.options.allowedActions.delete === 'boolean') {
-      this.allowDisableFunc = async () => resourceConfig.options.allowedActions.delete;
+      // the value is kept here, the option itself is turned off right below
+      const deleteAllowed = resourceConfig.options.allowedActions.delete;
+      this.allowDisableFunc = async () => deleteAllowed;
     } else {
       this.allowDisableFunc = async () => true;
     }
@@ -135,13 +141,14 @@ export default class UserSoftDelete extends AdminForthPlugin {
           return { ok: false, error: "No record id provided" };
         }
         
-        const oldUser = await this.adminforth
-          .resource(this.resourceConfig.resourceId)
-          .get([Filters.EQ(primaryKeyColumn.name, id)]);
-
-        if (!oldUser) {
-          throw new Error(`User with id ${id} not found`);
+        const users = this.adminforth.resource(this.resourceConfig.resourceId);
+        const filter = Filters.EQ(primaryKeyColumn.name, id);
+        // looked up as the user, so a user outside their row scope can not be deactivated
+        if (!await users.asUser(adminUser).get(filter).catch(() => null)) {
+          return { ok: false, error: `User with id ${id} not found` };
         }
+        // the hooks get the full row as oldRecord, backendOnly columns included
+        const oldUser = await users.get(filter);
 
         if (oldUser[this.options.activeFieldName] === false) {
           return {ok: false, error: "User is already deactivated"}
@@ -153,13 +160,12 @@ export default class UserSoftDelete extends AdminForthPlugin {
 
         const newUser = { [this.options.activeFieldName]: false };
         
-        await this.adminforth.updateResourceRecord({
-          resource: this.resourceConfig,
-          recordId: id,
-          oldRecord: oldUser,
-          updates: newUser,
-          adminUser: adminUser
-        })
+        // deactivation is guarded by the delete permission above, the user resource itself may be
+        // not editable and the active field hidden from the edit form, so it is a system write
+        const { error } = await users.asSystem({ adminUser, oldRecord: oldUser }).update(id, newUser);
+        if (error) {
+          return { ok: false, error };
+        }
         return {ok: true}
       }
     });
