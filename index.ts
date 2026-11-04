@@ -121,54 +121,59 @@ export default class UserSoftDelete extends AdminForthPlugin {
       path: `/plugin/${this.pluginInstanceId}/deactivateUser`,
       agent: { requiresHumanApproval: true },
       request_schema: deactivateUserBodySchema,
-      handler: async ({ adminUser, body, response }) => {
-        console.log(`UserSoftDelete: deactivateUser endpoint called by ${adminUser.dbUser[this.resourceConfig.columns.find((col) => col.primaryKey).name]}`);
-        const data = body as z.infer<typeof deactivateUserBodySchema>;
-        let isAllowedToDeactivate = false;
-        if ( typeof this.allowDisableFunc === "function" ) {
-          isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
-        }
-        if ( isAllowedToDeactivate === false ) {
-          return {ok: false, error: "Not allowed to deactivate user"}
-        }
-
-        const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
-        if (!data.record) {
-          return { ok: false, error: "No record provided" };
-        }
-        const id = data.record[primaryKeyColumn.name];
+      handler: async ({ adminUser, body }) => {
+        const primaryKeyName = this.resourceConfig.columns.find((col) => col.primaryKey).name;
+        console.log(`UserSoftDelete: deactivateUser endpoint called by ${adminUser.dbUser[primaryKeyName]}`);
+        const { record } = body as z.infer<typeof deactivateUserBodySchema>;
+        const id = record[primaryKeyName] as string | number;
         if (id === undefined || id === null) {
           return { ok: false, error: "No record id provided" };
         }
-        
-        const users = this.adminforth.resource(this.resourceConfig.resourceId);
-        const filter = Filters.EQ(primaryKeyColumn.name, id);
-        // looked up as the user, so a user outside their row scope can not be deactivated
-        if (!await users.asUser(adminUser).get(filter).catch(() => null)) {
-          return { ok: false, error: `User with id ${id} not found` };
-        }
-        // the hooks get the full row as oldRecord, backendOnly columns included
-        const oldUser = await users.get(filter);
-
-        if (oldUser[this.options.activeFieldName] === false) {
-          return {ok: false, error: "User is already deactivated"}
-        }
-        
-        if (oldUser[primaryKeyColumn.name] === adminUser.dbUser[primaryKeyColumn.name]) {
-          return {ok: false, error: "You cannot deactivate your own account"}
-        }
-
-        const newUser = { [this.options.activeFieldName]: false };
-        
-        // deactivation is guarded by the delete permission above, the user resource itself may be
-        // not editable and the active field hidden from the edit form, so it is a system write
-        const { error } = await users.asSystem({ adminUser, oldRecord: oldUser }).update(id, newUser);
-        if (error) {
-          return { ok: false, error };
-        }
-        return {ok: true}
+        return this.deactivateUser(id, adminUser);
       }
     });
+  }
+
+  /**
+   * Deactivates a user on behalf of `adminUser` with the same checks as the deactivate button:
+   * `canDeactivate` (or the delete permission), row scope of `adminUser`, and no self-deactivation.
+   */
+  async deactivateUser(id: string | number, adminUser: AdminUser): Promise<{ ok: boolean, error?: string }> {
+    let isAllowedToDeactivate = false;
+    if ( typeof this.allowDisableFunc === "function" ) {
+      isAllowedToDeactivate = await this.allowDisableFunc(adminUser);
+    }
+    if ( isAllowedToDeactivate === false ) {
+      return {ok: false, error: "Not allowed to deactivate user"}
+    }
+
+    const primaryKeyColumn = this.resourceConfig.columns.find((col) => col.primaryKey);
+    const users = this.adminforth.resource(this.resourceConfig.resourceId);
+    const filter = Filters.EQ(primaryKeyColumn.name, id);
+    // looked up as the user, so a user outside their row scope can not be deactivated
+    if (!await users.asUser(adminUser).get(filter).catch(() => null)) {
+      return { ok: false, error: `User with id ${id} not found` };
+    }
+    // the hooks get the full row as oldRecord, backendOnly columns included
+    const oldUser = await users.get(filter);
+
+    if (oldUser[this.options.activeFieldName] === false) {
+      return {ok: false, error: "User is already deactivated"}
+    }
+
+    if (oldUser[primaryKeyColumn.name] === adminUser.dbUser[primaryKeyColumn.name]) {
+      return {ok: false, error: "You cannot deactivate your own account"}
+    }
+
+    const newUser = { [this.options.activeFieldName]: false };
+
+    // deactivation is guarded by the delete permission above, the user resource itself may be
+    // not editable and the active field hidden from the edit form, so it is a system write
+    const { error } = await users.asSystem({ adminUser, oldRecord: oldUser }).update(id, newUser);
+    if (error) {
+      return { ok: false, error };
+    }
+    return {ok: true}
   }
 
 }
